@@ -122,9 +122,10 @@ export function useVoiceSession() {
     [sendWsMessage],
   );
 
-  const { startCapture, stopCapture, isCapturing, isMuted, toggleMute } = useAudioCapture({
-    onAudioChunk,
-  });
+  const {
+      startCapture, stopCapture, isCapturing, isMuted, toggleMute,
+      recordingBlob, recordingMimeType, resetRecording,
+    } = useAudioCapture({ onAudioChunk });
 
   const handleServerMessage = useCallback(
     (msg: ServerMessage) => {
@@ -370,6 +371,8 @@ export function useVoiceSession() {
     configLoaded,
     setInputModeRef: useCallback((mode: 'voice' | 'text') => { inputModeRef.current = mode; }, []),
     isPlaybackMuted,
-    togglePlaybackMute,
-  };
+      togglePlaybackMute,
+      recordingBlob,
+      recordingMimeType,
+    };
 }

@@ -1,0 +1,192 @@
+/* ─── Theme tokens: alias CSS vars to Fluent tokens (inside FluentProvider scope) ─── */
+[data-theme="dark"], [data-theme="light"] {
+  --bg-1: var(--colorNeutralBackground3Selected, #f5f5f5);
+  --bg-2: var(--colorNeutralBackground1, #ffffff);
+  --bg-3: var(--colorNeutralBackground2, #f0f0f0);
+  --fg-1: var(--colorNeutralForeground1, #242424);
+  --fg-2: var(--colorNeutralForeground2, #616161);
+  --fg-3: var(--colorNeutralForeground3, #adadad);
+  --voice-primary: var(--colorBrandBackground, #7B5EA7);
+  --voice-secondary: var(--colorBrandBackgroundHover, #6741b0);
+  --brand-fg: var(--colorBrandForeground1, #7B5EA7);
+  --brand-bg-2: var(--colorBrandBackground2, rgba(123, 94, 167, 0.12));
+  --border: var(--colorNeutralStroke1, rgba(0,0,0,0.10));
+  --border-subtle: var(--colorNeutralStroke2, rgba(0,0,0,0.06));
+  --surface: var(--colorSubtleBackground, rgba(0,0,0,0.03));
+  --surface-overlay: var(--colorNeutralBackground5, rgba(0,0,0,0.05));
+  --control-bar-bg: var(--colorNeutralBackground1, #ffffff);
+  --scrollbar-thumb: var(--colorNeutralStroke2, rgba(0,0,0,0.15));
+  --backdrop: rgba(0, 0, 0, 0.3);
+  --error: #dc2626;
+  --error-bg: rgba(220, 38, 38, 0.9);
+  --error-bg-subtle: rgba(220, 38, 38, 0.1);
+  --warning: #d97706;
+}
+
+/* Dark theme — fallback values match Foundry Portal's dark theme (HSL step system) */
+[data-theme="dark"] {
+  --bg-1: var(--colorNeutralBackground3Selected, #1c1c1c);
+  --bg-2: var(--colorNeutralBackground1, #1f1f1f);
+  --bg-3: var(--colorNeutralBackground2, #1a1a1a);
+  --fg-1: var(--colorNeutralForeground1, #ffffff);
+  --fg-2: var(--colorNeutralForeground2, #d6d6d6);
+  --fg-3: var(--colorNeutralForeground3, #adadad);
+  --voice-primary: var(--colorBrandBackground, #7B5EA7);
+  --border: var(--colorNeutralStroke1, rgba(255,255,255,0.10));
+  --border-subtle: var(--colorNeutralStroke2, rgba(255,255,255,0.06));
+  --surface-overlay: var(--colorNeutralBackground5, rgba(255,255,255,0.05));
+  --control-bar-bg: var(--colorNeutralBackground1, #1f1f1f);
+  --scrollbar-thumb: var(--colorNeutralStroke2, rgba(255,255,255,0.15));
+  --voice-glow: rgba(151, 117, 250, 0.4);
+  --voice-bg-subtle: rgba(151, 117, 250, 0.15);
+  --backdrop: rgba(0, 0, 0, 0.5);
+  --error: #ef4444;
+  --error-bg: rgba(239, 68, 68, 0.9);
+  --error-bg-subtle: rgba(239, 68, 68, 0.15);
+  --warning: #fbbf24;
+}
+
+[data-theme="light"] {
+  --voice-glow: rgba(124, 92, 191, 0.35);
+  --voice-bg-subtle: rgba(124, 92, 191, 0.1);
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Aptos, sans-serif;
+  background: var(--bg-1);
+  color: var(--fg-1);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* ─── App container — matches reference .container ─── */
+.appContainer {
+  position: relative;
+  container-type: inline-size;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+}
+
+/* ─── Content area — CSS Grid from reference .content ─── */
+.appContent {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template:
+    '. chatbot .' 100%
+    / 1fr minmax(min(450px, 100%), 50%) 1fr;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  margin: 0 16px 12px;
+}
+
+/* ─── Chatbot area — reference .chatbot ─── */
+.chatbotArea {
+  overflow: hidden;
+  display: flex;
+  grid-area: chatbot;
+  flex: 1;
+  flex-direction: column;
+  gap: 32px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* ─── Badge — grid-positioned, reference .builtWithBadge ─── */
+.builtWithBadge {
+  grid-column: 1;
+  grid-row: 1;
+  place-self: end start;
+  margin-right: 8px;
+}
+
+@container (width <= 768px) {
+  .builtWithBadge {
+    display: none;
+  }
+}
+
+/* ─── Waves container — reference .wavesContainer ─── */
+.wavesContainer {
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  width: 100%;
+  height: 300px;
+  max-height: 100%;
+  animation: waves-fade-in 1s ease-in-out;
+}
+
+.wavesContainer > canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Responsive ─── */
+@media (width <= 576px) {
+  .appContent {
+    margin: 0 8px 8px;
+  }
+}
+
+/* ─── Scrollbar styling ─── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+
+/* ─── Badge hover ─── */
+a[aria-label="Built with Microsoft Foundry"]:hover {
+  opacity: 1 !important;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes waves-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

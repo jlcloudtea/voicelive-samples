@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FluentProvider, Button, Text } from '@fluentui/react-components';
 import { Speaker224Regular, SpeakerOff24Regular, Dismiss24Regular } from '@fluentui/react-icons';
 import { voiceLiveLightTheme, voiceLiveDarkTheme } from './theme';
@@ -12,7 +12,6 @@ import { SessionEndedView } from './components/SessionEndedView';
 import { ChatMessages } from './components/ChatMessages';
 import { ChatInput } from './components/ChatInput';
 import { Waves } from './components/Waves';
-import { SettingsPanel } from './components/SettingsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
 import { BuiltWithBadge } from './components/BuiltWithBadge';
 import { VoiceOrb } from './components/VoiceOrb';
@@ -39,13 +38,18 @@ const App: React.FC = () => {
     setInputModeRef,
     isPlaybackMuted,
     togglePlaybackMute,
-  } = useVoiceSession();
+      recordingBlob,
+      recordingMimeType,
+    } = useVoiceSession();
 
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { lockedMode, isLocked, agent, project, theme: urlTheme, greetingDisabled } = useUrlParams();
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [inputMode, setInputMode] = useState<InputMode>(lockedMode ?? 'voice');
 
+  const SESSION_SECONDS = 10 * 60;
+  const [remainingSeconds, setRemainingSeconds] = useState(SESSION_SECONDS);
+  const [sessionDurationMs, setSessionDurationMs] = useState(0);
+  const timerStartedAtRef = useRef<number | null>(null);
   useEffect(() => { setInputModeRef(inputMode); }, [inputMode, setInputModeRef]);
 
   // Apply URL param overrides once config is loaded
@@ -64,25 +68,66 @@ const App: React.FC = () => {
     if (urlTheme) setTheme(urlTheme);
   }, [urlTheme, setTheme]);
 
+  useEffect(() => {
+
+    const running = state === 'listening' || state === 'thinking' || state === 'speaking';
+
+    if (!running) return;
+
+    if (timerStartedAtRef.current === null) timerStartedAtRef.current = Date.now();
+
+    const tick = () => {
+
+      const elapsedMs = Date.now() - (timerStartedAtRef.current ?? Date.now());
+
+      const next = Math.max(0, SESSION_SECONDS - Math.floor(elapsedMs / 1000));
+
+      setRemainingSeconds(next);
+
+      setSessionDurationMs(elapsedMs);
+
+      if (next === 0) stopSession();
+
+    };
+
+    tick();
+
+    const id = window.setInterval(tick, 250);
+
+    return () => window.clearInterval(id);
+
+  }, [state, stopSession]);
+
+
   const isActive = state === 'connecting' || state === 'listening' || state === 'thinking' || state === 'speaking';
   const isIdle = state === 'idle';
 
   const handleNewThread = () => {
     if (isActive) { stopSession(); }
     resetSession();
+    timerStartedAtRef.current = null;
+    setRemainingSeconds(SESSION_SECONDS);
+    setSessionDurationMs(0);
   };
 
   const showControls = !isLocked;
   const agentMissingConfig = settings.mode === 'agent' && (!settings.agentName?.trim() || !settings.project?.trim());
   const startDisabled = agentMissingConfig && !isLocked;
   const agentDisplayName = settings.mode === 'agent' ? (settings.agentName || 'Voice Assistant') : (settings.model || 'Voice Assistant');
+  const pageTitle = 'AI Troubleshooting Demo';
   const formatName = (name: string) => name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ');
 
   return (
     <FluentProvider theme={resolvedTheme === 'dark' ? voiceLiveDarkTheme : voiceLiveLightTheme} style={{ height: '100vh' }}>
       <div className="appContainer">
         <ErrorBanner message={errorMessage} onDismiss={dismissError} />
-        <TopBar agentName={agentDisplayName} onNewThread={handleNewThread} onOpenSettings={() => setSettingsOpen(true)} showControls={showControls} isSessionActive={isActive} />
+        <TopBar agentName={pageTitle} onNewThread={handleNewThread} showControls={showControls} isSessionActive={isActive} />
+          {(isActive || state === 'ended') && (
+            <div className={`sessionTimer ${remainingSeconds <= 60 ? 'warning' : ''}`} aria-live="polite">
+              <span>Time remaining</span>
+              <strong>{Math.floor(remainingSeconds / 60)}:{String(remainingSeconds % 60).padStart(2, '0')}</strong>
+            </div>
+          )}
 
         {/* Waves — absolute positioned at bottom, inside container */}
         {(isIdle || state === 'connecting') && <div className="wavesContainer"><Waves paused={false} /></div>}
@@ -93,19 +138,19 @@ const App: React.FC = () => {
               <>
                 {/* Agent details area */}
                 <div style={agentDetailsStyle}>
-                  <Text as="h1" weight="semibold" size={400}>{formatName(agentDisplayName)}</Text>
+                  <Text as="h1" weight="semibold" size={400}>{pageTitle}</Text>
                   <Text size={300} style={{ color: 'var(--fg-2)' }}>
                     {settings.mode === 'agent'
-                      ? (settings.project ? `${formatName(agentDisplayName)} with ${settings.project} project.` : 'Voice agent ready to assist.')
-                      : 'Talk like you would to a person. The agent listens and responds.'}
+                      ? (settings.project ? `${pageTitle} with ${settings.project} project.` : 'Voice agent ready to assist.')
+                      : 'Describe a technical issue in your own words. The assistant will ask diagnostic questions and guide the investigation step by step.'}
                   </Text>
                 </div>
                 {/* Voice idle panel */}
                 <div style={idlePanelStyle}>
                   <VoiceOrb state="idle" />
-                  <div style={idleTitleStyle}>Let's talk</div>
+                  <div style={idleTitleStyle}>Start troubleshooting</div>
                   <div style={idleSubtitleStyle}>
-                    Talk like you would to a person. The agent listens and responds.
+                    Describe a technical issue in your own words. The assistant will ask diagnostic questions and guide the investigation step by step.
                   </div>
                   <Button
                     appearance="primary"
@@ -116,9 +161,31 @@ const App: React.FC = () => {
                     title={startDisabled ? 'Agent Name and Project required' : undefined}
                     style={startButtonStyle}
                   >
-                    Start session
+                    Start troubleshooting session
                   </Button>
                   {startDisabled && !isLocked && <Text size={200} style={{ color: 'var(--fg-2)' }}>Open Settings (···) to configure Agent Name and Project</Text>}
+                  <section className="demoGuide" aria-label="Troubleshooting demo guidance">
+                    <div className="demoGuideHeader">
+                      <span className="demoEyebrow">VOICE PRACTICE</span>
+                      <h2>How to use this demo</h2>
+                      <p>Give the assistant symptoms rather than a diagnosis. Work through the problem methodically and confirm the result after each test.</p>
+                    </div>
+                    <div className="demoCards">
+                      <article className="demoCard"><span>1</span><div><strong>Describe</strong><p>Explain what works, what fails, and when the issue started.</p></div></article>
+                      <article className="demoCard"><span>2</span><div><strong>Investigate</strong><p>Answer questions and propose safe diagnostic checks.</p></div></article>
+                      <article className="demoCard"><span>3</span><div><strong>Verify</strong><p>Confirm the fix and summarise the likely root cause.</p></div></article>
+                    </div>
+                    <div className="demoPrompts">
+                      <strong>Try one of these scenarios</strong>
+                      <ul>
+                        <li>A computer can ping the gateway but cannot open websites.</li>
+                        <li>A hostname fails to resolve, but its IP address is reachable.</li>
+                        <li>A web service works locally but cannot be reached remotely.</li>
+                        <li>Two cloud virtual machines cannot communicate across networks.</li>
+                      </ul>
+                    </div>
+                    <p className="demoNotice">Demo environment: do not provide passwords, access tokens, API keys, or personal information.</p>
+                  </section>
                 </div>
               </>
             )}
@@ -126,7 +193,7 @@ const App: React.FC = () => {
             {state === 'connecting' && (
               <div style={idlePanelStyle}>
                 <VoiceOrb state="connecting" />
-                <Text weight="semibold" size={400}>Connecting...</Text>
+                <Text weight="semibold" size={400}>Connecting to troubleshooting assistant...</Text>
               </div>
             )}
 
@@ -135,7 +202,14 @@ const App: React.FC = () => {
             )}
 
             {state === 'ended' && (
-              <SessionEndedView sessionId={sessionId} transcripts={transcripts} onNewThread={handleNewThread} />
+              <SessionEndedView
+                sessionId={sessionId}
+                transcripts={transcripts}
+                onNewThread={handleNewThread}
+                recordingBlob={recordingBlob}
+                recordingMimeType={recordingMimeType}
+                durationMs={sessionDurationMs}
+              />
             )}
 
             {isActive && state !== 'connecting' && inputMode === 'text' && (
@@ -161,9 +235,7 @@ const App: React.FC = () => {
 
           <BuiltWithBadge className="builtWithBadge" />
         </div>
-
-        <SettingsPanel isOpen={settingsOpen} settings={settings} onUpdate={updateSettings} onClose={() => setSettingsOpen(false)} azureSpeechLocales={azureSpeechLocales} theme={theme} onThemeChange={setTheme} />
-      </div>
+</div>
     </FluentProvider>
   );
 };
