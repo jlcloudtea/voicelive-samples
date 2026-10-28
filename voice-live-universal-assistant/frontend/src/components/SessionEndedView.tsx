@@ -27,7 +27,7 @@ export const SessionEndedView: React.FC<SessionEndedViewProps> = ({ transcripts,
   return <div className="sessionCompleteCard">
     <span className="completionEyebrow">SESSION COMPLETE</span>
     <h2>Your practice files are ready</h2>
-    <p>The transcript includes both sides. The audio contains microphone input recorded locally in this browser.</p>
+    <p>The transcript and audio include both the student and the assistant. The recording is created locally in this browser.</p>
     <div className="downloadActions">
       <Button appearance="primary" icon={<ArrowDownloadRegular />} onClick={downloadTranscript} disabled={!finals.length}>Download transcript (.txt)</Button>
       <Button icon={<ArrowDownloadRegular />} onClick={() => recordingBlob && downloadBlob(recordingBlob, `troubleshooting-audio-${stamp()}.${audioExtension}`)} disabled={!recordingBlob}>Download audio (.{audioExtension})</Button>

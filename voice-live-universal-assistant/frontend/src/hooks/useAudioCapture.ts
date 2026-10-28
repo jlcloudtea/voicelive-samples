@@ -5,26 +5,17 @@ const BUFFER_SIZE = 4800;
 
 interface UseAudioCaptureOptions {
   onAudioChunk: (base64Data: string) => void;
+  onStreamReady?: (stream: MediaStream) => void;
 }
 
-function chooseRecordingMimeType(): string {
-  if (typeof MediaRecorder === 'undefined') return '';
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) || '';
-}
-
-export function useAudioCapture({ onAudioChunk }: UseAudioCaptureOptions) {
+export function useAudioCapture({ onAudioChunk, onStreamReady }: UseAudioCaptureOptions) {
   const [isCapturing, setIsCapturing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
-  const [recordingMimeType, setRecordingMimeType] = useState('');
   const audioContextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const bufferRef = useRef<Int16Array>(new Int16Array(0));
   const isMutedRef = useRef(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
 
   const flushBuffer = useCallback((buffer: Int16Array) => {
     const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
@@ -33,36 +24,12 @@ export function useAudioCapture({ onAudioChunk }: UseAudioCaptureOptions) {
     onAudioChunk(btoa(binary));
   }, [onAudioChunk]);
 
-  const resetRecording = useCallback(() => {
-    setRecordingBlob(null);
-    setRecordingMimeType('');
-    recordedChunksRef.current = [];
-  }, []);
-
   const startCapture = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { sampleRate: SAMPLE_RATE, channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
     streamRef.current = stream;
-    resetRecording();
-
-    if (typeof MediaRecorder !== 'undefined') {
-      const mimeType = chooseRecordingMimeType();
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      recorderRef.current = recorder;
-      recordedChunksRef.current = [];
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        const actualType = recorder.mimeType || mimeType || 'audio/webm';
-        if (recordedChunksRef.current.length) {
-          setRecordingBlob(new Blob(recordedChunksRef.current, { type: actualType }));
-          setRecordingMimeType(actualType);
-        }
-      };
-      recorder.start(1000);
-    }
+    onStreamReady?.(stream);
 
     const audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
     audioContextRef.current = audioContext;
@@ -74,9 +41,9 @@ export function useAudioCapture({ onAudioChunk }: UseAudioCaptureOptions) {
     workletNode.port.onmessage = (event: MessageEvent) => {
       if (isMutedRef.current) return;
       const incoming = new Int16Array(event.data.buffer);
-      const prev = bufferRef.current;
-      const merged = new Int16Array(prev.length + incoming.length);
-      merged.set(prev); merged.set(incoming, prev.length);
+      const previous = bufferRef.current;
+      const merged = new Int16Array(previous.length + incoming.length);
+      merged.set(previous); merged.set(incoming, previous.length);
       let offset = 0;
       const samplesPerChunk = BUFFER_SIZE / 2;
       while (offset + samplesPerChunk <= merged.length) {
@@ -88,11 +55,9 @@ export function useAudioCapture({ onAudioChunk }: UseAudioCaptureOptions) {
     source.connect(workletNode);
     workletNode.connect(audioContext.destination);
     setIsCapturing(true);
-  }, [flushBuffer, resetRecording]);
+  }, [flushBuffer, onStreamReady]);
 
   const stopCapture = useCallback(() => {
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-    recorderRef.current = null;
     workletNodeRef.current?.disconnect();
     workletNodeRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -104,14 +69,11 @@ export function useAudioCapture({ onAudioChunk }: UseAudioCaptureOptions) {
   }, []);
 
   const toggleMute = useCallback(() => {
-    setIsMuted((prev) => {
-      isMutedRef.current = !prev;
-      return !prev;
+    setIsMuted((previous) => {
+      isMutedRef.current = !previous;
+      return !previous;
     });
   }, []);
 
-  return {
-    startCapture, stopCapture, isCapturing, isMuted, toggleMute,
-    recordingBlob, recordingMimeType, resetRecording,
-  };
+  return { startCapture, stopCapture, isCapturing, isMuted, toggleMute };
 }
